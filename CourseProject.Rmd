@@ -130,13 +130,20 @@ modFit$resample
 modFit$finalModel
 ```
 For the sake of rigor, I repeated this analysis multiple times with different preprocessing threshold values.  This resulted in a range of out of sample error rates.  These are summarized in the following table.
+
 ```{r, OOStable, fig.width=6, fig.height=6, fig.align='center',results='asis', echo=FALSE}
 OOSframe <- data.frame(Threshold=c(80, 85, 90, 95, 99), 
                         NumComponents=c(13, 16, 20, 26, 37),
                         ErrorRatePct=c(3.9, 3.1, 2.8, 2.6, 2.0))
 kable(OOSframe, format="html", digits=c(0,0,1), align=c('c','c','c'))
 ```
+I also tried varying the number of folds and repetitions for cross-validation to see if I could reduce the out of sample error. As the following table shows, however, this had virtually no impact on model performance.
 
+```{r, kfoldtable, fig.width=6, fig.height=6, fig.align='center',results='asis', echo=FALSE}
+kframe <- data.frame(Folds=c(3, 5, 10, 15, 20, 25), 
+                     ErrorRatePct=c(2.64, 2.66, 2.80, 2.65, 2.81, 2.72))
+kable(kframe, format="html", digits=c(0,2), align=c('c','c'))
+```
 ### Model Performance
 For model evaluation, I selected the model with a threshold value of 90%.  I applied the model to the portion of the original training model that I set aside for testing.  Results were as follows.
 

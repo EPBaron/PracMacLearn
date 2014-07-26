@@ -169,7 +169,7 @@ modFit$resample</code></pre>
 ## C    9   31 2322   32    2     0.03088
 ## D    6    4   99 2136    7     0.05151
 ## E    3    8   20   16 2478     0.01861</code></pre>
-For the sake of rigor, I repeated this analysis multiple times with different preprocessing threshold values. This resulted in a range of out of sample error rates. These are summarized in the following table.
+<p>For the sake of rigor, I repeated this analysis multiple times with different preprocessing threshold values. This resulted in a range of out of sample error rates. These are summarized in the following table.</p>
 <table>
  <thead>
   <tr>
@@ -242,13 +242,78 @@ ErrorRatePct
   </tr>
 </tbody>
 </table>
-
+<p>I also tried varying the number of folds and repetitions for cross-validation to see if I could reduce the out of sample error. As the following table shows, however, this had virtually no impact on model performance.</p>
+<table>
+ <thead>
+  <tr>
+   <th align="center"> 
+Folds
+</th>
+   <th align="center"> 
+ErrorRatePct
+</th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td align="center"> 
+3
+</td>
+   <td align="center"> 
+2.64
+</td>
+  </tr>
+  <tr>
+   <td align="center"> 
+5
+</td>
+   <td align="center"> 
+2.66
+</td>
+  </tr>
+  <tr>
+   <td align="center"> 
+10
+</td>
+   <td align="center"> 
+2.80
+</td>
+  </tr>
+  <tr>
+   <td align="center"> 
+15
+</td>
+   <td align="center"> 
+2.65
+</td>
+  </tr>
+  <tr>
+   <td align="center"> 
+20
+</td>
+   <td align="center"> 
+2.81
+</td>
+  </tr>
+  <tr>
+   <td align="center"> 
+25
+</td>
+   <td align="center"> 
+2.72
+</td>
+  </tr>
+</tbody>
+</table>
 </div>
 <div id="model-performance" class="section level3">
 <h3>Model Performance</h3>
 <p>For model evaluation, I selected the model with a threshold value of 90%. I applied the model to the portion of the original training model that I set aside for testing. Results were as follows.</p>
-<pre class="r"><code>pred &lt;- predict(modFit, newdata=testPC)
-predright &lt;- pred == traintest$classe
+<pre class="r"><code>pred &lt;- predict(modFit, newdata=testPC)</code></pre>
+<pre><code>## Loading required package: randomForest
+## randomForest 4.6-7
+## Type rfNews() to see new features/changes/bug fixes.</code></pre>
+<pre class="r"><code>predright &lt;- pred == traintest$classe
 table(pred, traintest$classe)</code></pre>
 <pre><code>##     
 ## pred    A    B    C    D    E
