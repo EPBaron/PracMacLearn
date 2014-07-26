@@ -1,0 +1,156 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Ephraim Baron"
+date: "July 26, 2014"
+output: html_document
+---
+## Executive Summary
+The purpose of this report is to analyze data from a particular type of physical activity to determine if it is being performed in accordance with a qualitative standard.  This project is based on the work done by Velloso, E.; Bulling, A., et. al entitled "Qualitative Activity Recognition of Weight Lifting Exercises".  Source data is available at  http://groupware.les.inf.puc-rio.br/har
+
+Two data sets were provided, a training set:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+and a test set:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The goal was to construct an efficient model for predicting how an exercise was being performed based on sensor data.
+The final model selected was able to classify activities with an out of sample error of less than 3%.
+
+```{r setup, echo=FALSE}
+library(knitr)
+opts_chunk$set(fig.align = 'center', dpi = 100)
+setwd("E:/Data Science Track/Practical Machine Learning")
+```
+
+## Exploratory Data Analysis
+The analysis was done in the R programming language.  I began by loading and initializing a number of R packages
+
+```{r init, echo=FALSE}
+require(caret)        # package for classification and regression training
+require(doParallel)   # package for parallel processing
+require(corrplot)     # graphical display of a correlation matrix
+require(FactoMineR)   # Multivariate Exploratory Data Analysis and Data Mining
+
+# configure parallel processing
+cl<-makeCluster(detectCores())
+registerDoParallel(cl)
+```
+Next I loaded the data and removed columns that were almost entirely NA or blank.  I also removed time and factor variables.  I kept the classe variable that was the target factor that the model was being trained to predict.
+
+```{r clean, echo=TRUE}
+training <- read.csv("pml-training.csv", header=TRUE, na.strings=c("NA",""))
+testing <- read.csv("pml-testing.csv", header=TRUE, na.strings=c("NA",""))
+clean <- function(data) {
+        for(i in ncol(data):1) {
+                if(is.na(data[1,i])) {
+                        data <- data[,-i]
+                }
+        }
+        data
+}
+
+# clean the training data set
+training <- clean(training)
+training$classe <- as.factor(training$classe)
+training <- training[,-(1:7)]
+
+# clean the test data set
+testing <- clean(testing)
+testing <- testing[,-(1:7)]
+testing <- testing[,-53]
+```
+This resulted in 52 quantitative variables and one result variable.
+
+Next I split the training data set into train and test subsets to create and evaluate my predictive model.
+
+```{r inTrain, echo=TRUE}
+inTrain <- createDataPartition(training$classe, p=0.7, list=FALSE)
+traintrain <- training[inTrain,]
+traintest <- training[-inTrain,]
+```
+### Principal Component Analysis
+Rather than using all 52 variables, I sought to reduce the number of model variables.  I began be looking the correlation between different variables.  Using the corrplot package, I created a plot of variable cross-correlation.
+
+```{r corrplot, fig.width=5, fig.height=4, echo=TRUE}
+# look for highly correlated variables
+train.scale<- scale(traintrain[1:(ncol(traintrain)-1)],center=TRUE,scale=TRUE)
+cortrain <- cor(train.scale)
+highlyCor <- findCorrelation(cortrain, 0.9)
+#Apply correlation filter at 0.90,
+#then we remove all the variable correlated with more 0.9.
+trainFiltered.scale <- train.scale[,-highlyCor]
+cortrainFilt <- cor(trainFiltered.scale)
+corrplot(cortrainFilt, order = "hclust",tl.cex=0.5)
+```
+From this plot, it is clear that several variables are highly correlated, both positively and negatively.  For example, 'accell_dumbell_z' is strongly positively correlated with 'yaw_dumbell'.  Similarly, 'magnet_belt_x' is strongly negatively correlated with 'pitch_belt'.  This indicates that an accurate model should be possible with a subset of variables.
+
+As an additional test of variable influence, I used the FactoMineR package to perform a principal component analysis.  This generates a factor map of variables indicating how close they are to each other.  The longer the vector, the more it contributes to variance.  This information is further summarized to provide an indication of the relative variance of each variable
+
+```{r FactoMineR, fig.width=10, fig.height=6, echo=TRUE}
+# PCA with function PCA
+par(mfrow = c(1, 2))
+trainpca <- PCA(traintrain[-53], scale.unit=TRUE, ncp=5, graph=TRUE)
+```
+This analysis indicates that the 10 variables that most affect the outcome variable are:
+
+roll_belt       
+pitch_belt      
+yaw_belt        
+total_accel_belt
+gyros_belt_x    
+gyros_belt_y    
+gyros_belt_z    
+accel_belt_x    
+accel_belt_y    
+accel_belt_z    
+
+### Model Development
+I used the caret package to model the data.  I preprocessed the data sets with a threshold setting of 90%.  The preProcess function resulted in components being selected and normalized for further analysis.
+
+```{r, preprocess, echo=TRUE}
+preProc <- preProcess(traintrain[,-53], method="pca", thresh=0.9)
+preProc
+trainPC <- predict(preProc, traintrain[,-53])
+testPC <- predict(preProc, traintest[-53])
+```
+The following plot shows the top 2 principal components colored by the classe variable.  Despite the fact that there are 5 clear clusters, they do not align directly with the classe variable.
+
+```{r PCplot, fig.width=8, fig.height=5, echo=FALSE}
+par(mfrow = c(1, 1))
+qplot(PC1, PC2, data=trainPC, col=traintrain$classe)
+```
+
+I then ran a random forest analysis against the training subset.  I included cross validation with 5 folds. 
+
+```{r model, fig.width=6, fig.height=6, echo=TRUE, cache=TRUE}
+tc <- trainControl(method = "cv", number=5, repeats=5)
+modFit <- train(traintrain$classe ~ ., method="rf",
+                trControl=tc, data=trainPC, importance=TRUE)
+modFit$resample
+modFit$finalModel
+```
+For the sake of rigor, I repeated this analysis multiple times with different preprocessing threshold values.  This resulted in a range of out of sample error rates.  These are summarized in the following table.
+```{r, OOStable, fig.width=6, fig.height=6, fig.align='center',results='asis', echo=FALSE}
+OOSframe <- data.frame(Threshold=c(80, 85, 90, 95, 99), 
+                        NumComponents=c(13, 16, 20, 26, 37),
+                        ErrorRatePct=c(3.9, 3.1, 2.8, 2.6, 2.0))
+kable(OOSframe, format="html", digits=c(0,0,1), align=c('c','c','c'))
+```
+
+### Model Performance
+For model evaluation, I selected the model with a threshold value of 90%.  I applied the model to the portion of the original training model that I set aside for testing.  Results were as follows.
+
+```{r testperf, echo=TRUE}
+pred <- predict(modFit, newdata=testPC)
+predright <- pred == traintest$classe
+table(pred, traintest$classe)
+```
+This indicates a fairly low error rate, with the highest error being for classe = C.
+
+Finally, I applied the prediction to the set of 20 test cases provided.  The results were as follows.
+```{r testset, echo=TRUE}
+testPC <- predict(preProc, testing)
+pred <- predict(modFit, testPC)
+pred
+```
+Based on submission to the online grading system, all values were correct.
