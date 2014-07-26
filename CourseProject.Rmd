@@ -152,7 +152,7 @@ pred <- predict(modFit, newdata=testPC)
 predright <- pred == traintest$classe
 table(pred, traintest$classe)
 ```
-This indicates a fairly low error rate, with the highest error being for classe = C.
+This indicates an error rate of 2.55%, which is actually slightly lower than the training set.
 
 Finally, I applied the prediction to the set of 20 test cases provided.  The results were as follows.
 ```{r testset, echo=TRUE}
